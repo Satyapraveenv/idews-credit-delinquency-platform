@@ -277,15 +277,15 @@ pytest tests/test_api.py -v
 
 ## About the Author
 
-**Satya Praveen** — Senior Consultant & AI Innovation Lead
+**Satya Praveen Vemuri** — Senior Program & Delivery Leader | GenAI-Augmented Enterprise Transformation | Quality Engineering Excellence
 
-- 20 years across BFSI, Telecom, SaaS, EdTech
-- ISB Executive MBA (INSEAD Singapore immersion)
-- CPMAI Certified | $25M+ career delivery portfolio
-- Built 2 Quality Engineering Centres of Excellence
-- Hands-on with n8n, Vapi, MCP, OpenAI API
+20 years building programs that work across BFSI, Telecom, SaaS, and EdTech. Currently Senior Consultant & Delivery Head at Infuse Consulting, managing a $5M+ enterprise portfolio. ISB-INSEAD Executive MBA. CPMAI certified.
 
-[LinkedIn](https://linkedin.com/in/Satyapraveenv) · [GitHub](https://github.com/Satyapraveenv)
+- **Program Leadership:** Multi-year enterprise programs, P&L ownership, $25M+ career delivery portfolio
+- **Quality Engineering:** Built 2 Centres of Excellence — 85% automation, 40% cost reduction, zero critical defects at Tier-1 bank launch
+- **AI Practitioner:** Hands-on with n8n, Vapi, MCP, OpenAI API — building production AI tools for enterprise delivery
+
+[LinkedIn](https://linkedin.com/in/Satyapraveenv) · [GitHub](https://github.com/Satyapraveenv) · [Portfolio](https://satyapraveenvemuri.bolt.host)
 
 ---
 
