@@ -1,0 +1,87 @@
+# ============================================================
+# IDEWS — Feature Configuration
+# UCI Credit Card Default Dataset (30,000 accounts, 25 raw features)
+# ============================================================
+
+dataset:
+  name: "UCI Credit Card Default"
+  source_url: "https://archive.ics.uci.edu/ml/machine-learning-databases/00350/default%20of%20credit%20card%20clients.xls"
+  local_path: "data/raw/credit_card_default.csv"
+  processed_path: "data/processed/features.parquet"
+  target_column: "default_payment_next_month"
+  n_records: 30000
+  n_raw_features: 25
+  n_derived_features: 35
+
+# Raw feature groups from UCI dataset
+raw_features:
+  identity:
+    - LIMIT_BAL     # Credit limit (NT dollar)
+    - SEX           # 1=male, 2=female
+    - EDUCATION     # 1=graduate, 2=university, 3=high school, 4=others
+    - MARRIAGE      # 1=married, 2=single, 3=others
+    - AGE           # Age in years
+
+  payment_history:  # -1=pay duly, 1=1 month delay, 2=2 month delay, etc.
+    - PAY_0         # Repayment status in September 2005
+    - PAY_2         # Repayment status in August 2005
+    - PAY_3         # Repayment status in July 2005
+    - PAY_4         # Repayment status in June 2005
+    - PAY_5         # Repayment status in May 2005
+    - PAY_6         # Repayment status in April 2005
+
+  bill_amounts:
+    - BILL_AMT1     # Bill statement September 2005
+    - BILL_AMT2     # Bill statement August 2005
+    - BILL_AMT3     # Bill statement July 2005
+    - BILL_AMT4     # Bill statement June 2005
+    - BILL_AMT5     # Bill statement May 2005
+    - BILL_AMT6     # Bill statement April 2005
+
+  payment_amounts:
+    - PAY_AMT1      # Previous payment September 2005
+    - PAY_AMT2      # Previous payment August 2005
+    - PAY_AMT3      # Previous payment July 2005
+    - PAY_AMT4      # Previous payment June 2005
+    - PAY_AMT5      # Previous payment May 2005
+    - PAY_AMT6      # Previous payment April 2005
+
+# Derived features (engineered from raw)
+derived_features:
+  utilisation:
+    - util_rate_m1          # BILL_AMT1 / LIMIT_BAL
+    - util_rate_m2
+    - util_rate_m3
+    - util_trend_slope      # Linear trend slope of utilisation over 6 months
+    - util_max_6m           # Max utilisation in last 6 months
+    - util_volatility       # Std dev of utilisation (behavioural instability signal)
+
+  payment_behaviour:
+    - pay_ratio_m1          # PAY_AMT1 / BILL_AMT1 (how much of bill was paid)
+    - pay_ratio_m2
+    - pay_ratio_m3
+    - pay_ratio_avg_3m      # Average payment ratio over 3 months
+    - is_minimum_pay_m1     # 1 if paid <15% of bill (minimum payment proxy)
+    - min_pay_streak        # Consecutive months with minimum-only payment
+    - cash_advance_ratio    # Ratio of months with late payment history > 0
+
+  delinquency_signals:
+    - max_delay_6m          # Maximum payment delay in last 6 months
+    - total_delay_score     # Weighted sum of PAY_0 to PAY_6
+    - consecutive_late      # Count of consecutive months with delay > 0
+    - recency_of_late       # Months since last late payment (0 if current)
+
+  composite:
+    - behavioural_risk_score   # Composite score: utilisation + payment + delay signals
+    - balance_growth_rate      # (BILL_AMT1 - BILL_AMT6) / BILL_AMT6
+    - payment_momentum         # Trend in payment ratios (improving or worsening)
+
+# Categorical encoding
+categorical_features:
+  - SEX
+  - EDUCATION
+  - MARRIAGE
+
+# Features to drop (leakage risk or redundant)
+drop_features:
+  - ID                     # Row identifier — not predictive

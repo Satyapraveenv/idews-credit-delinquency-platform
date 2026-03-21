@@ -1,0 +1,93 @@
+# ============================================================
+# IDEWS — Automated Model Retraining Pipeline
+# Triggers when drift is detected or on monthly schedule
+# Retrains, validates, and deploys a new champion model
+# ============================================================
+
+name: IDEWS Model Retraining
+
+on:
+  schedule:
+    - cron: "0 2 1 * *"         # Monthly: 1st of each month at 2am UTC
+  workflow_dispatch:             # Manual trigger via GitHub UI
+    inputs:
+      reason:
+        description: "Reason for manual retrain (e.g., drift detected)"
+        required: true
+        default: "Scheduled retrain"
+
+jobs:
+  retrain:
+    name: Retrain & Validate Model
+    runs-on: ubuntu-latest
+    environment: production       # Requires manual approval for prod deployment
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run data quality gate
+        run: |
+          python -c "
+          from src.data.ingestion import load_dataset;
+          from src.data.validation import validate_dataset;
+          df = load_dataset();
+          report = validate_dataset(df, raise_on_failure=True);
+          print(f'Data quality: {report[\"n_failures\"]} failures')
+          "
+
+      - name: Train new model
+        env:
+          MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          python -m src.models.train --config config/model_config.yaml
+          echo "Training complete"
+
+      - name: Validate model performance thresholds
+        run: |
+          python -c "
+          import json, sys
+          with open('reports/latest_metrics.json') as f:
+              m = json.load(f)
+          print(f'AUC-ROC: {m[\"auc_roc\"]:.4f}  KS: {m[\"ks_statistic\"]:.4f}')
+          if m['auc_roc'] < 0.80:
+              print('FAILED: AUC-ROC below minimum threshold'); sys.exit(1)
+          print('PASSED: Model meets performance thresholds')
+          "
+
+      - name: Build and push Docker image
+        if: success()
+        run: |
+          gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev
+          docker build -f docker/Dockerfile.api \
+            -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/idews/api:${{ github.sha }} .
+          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/idews/api:${{ github.sha }}
+
+      - name: Deploy to Vertex AI Endpoint (Champion/Challenger)
+        if: success()
+        run: |
+          python vertex/deploy_endpoint.py \
+            --model-path models/idews_model.json \
+            --project ${{ secrets.GCP_PROJECT_ID }} \
+            --region ${{ secrets.GCP_REGION }} \
+            --traffic-split "new=20,current=80"  # Start at 20% challenger traffic
+
+      - name: Notify on completion
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          echo "Retraining pipeline: $STATUS — Reason: ${{ github.event.inputs.reason || 'Scheduled' }}"

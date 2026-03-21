@@ -1,0 +1,72 @@
+version: "3.9"
+
+# ============================================================
+# IDEWS — Local Development Stack
+# Runs the full system locally with one command: docker compose up
+# ============================================================
+
+services:
+
+  # ── Scoring API ──────────────────────────────────────────────
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: idews-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_PATH=/app/models/idews_model.json
+      - MODEL_VERSION=1.0.0
+      - OPERATING_THRESHOLD=0.40
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      - ../models:/app/models:ro          # Model artifacts (read-only)
+      - ../src:/app/src:ro                # Source code
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+
+  # ── Risk Monitoring Dashboard ─────────────────────────────────
+  dashboard:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dashboard
+    container_name: idews-dashboard
+    ports:
+      - "8501:8501"
+    environment:
+      - API_BASE_URL=http://api:8000
+    volumes:
+      - ../src:/app/src:ro
+      - ../reports:/app/reports
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── MLflow Tracking Server ────────────────────────────────────
+  mlflow:
+    image: python:3.11-slim
+    container_name: idews-mlflow
+    command: >
+      bash -c "pip install mlflow -q &&
+               mlflow server
+               --backend-store-uri sqlite:///mlflow.db
+               --default-artifact-root /mlruns
+               --host 0.0.0.0
+               --port 5000"
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow_data:/mlruns
+      - mlflow_db:/mlflow.db
+    restart: unless-stopped
+
+volumes:
+  mlflow_data:
+  mlflow_db:

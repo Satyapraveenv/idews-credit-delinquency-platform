@@ -1,0 +1,37 @@
+# ============================================================
+# IDEWS — Monitoring & Governance Configuration
+# ============================================================
+
+drift_monitoring:
+  psi_threshold: 0.2          # Population Stability Index — alert if PSI > 0.2
+  psi_warning:  0.1           # Warning level (PSI between 0.1 and 0.2)
+  check_frequency: "daily"    # How often to run drift checks
+  reference_window_days: 90   # Days of historical data to use as reference
+  current_window_days: 30     # Days of recent data to check against reference
+  top_features_to_monitor: 15 # Monitor top N features by importance
+  report_output_path: "reports/drift"
+
+model_performance:
+  alert_auc_drop: 0.05        # Alert if AUC drops more than 5% from baseline
+  alert_ks_drop: 0.08         # Alert if KS statistic drops more than 8%
+  check_frequency: "weekly"
+  baseline_auc: 0.82          # Set after first training run
+  report_output_path: "reports/performance"
+
+explainability_stability:
+  shap_rank_change_alert: 3   # Alert if any top-5 feature shifts rank by > 3
+  check_frequency: "weekly"
+
+retraining:
+  auto_retrain_on_drift: true
+  drift_trigger_psi: 0.2      # Retrain if PSI exceeds this
+  performance_trigger_auc: 0.75  # Retrain if AUC falls below this
+  min_retrain_samples: 5000   # Minimum records needed before retraining
+  retrain_cadence: "monthly"  # Even without drift, retrain monthly
+
+governance:
+  regulatory_framework: ["IFRS9", "SR11-7", "Basel-IV", "ECOA"]
+  model_validation_required: true
+  adverse_action_codes: true  # Generate reason codes for every high-risk flag
+  audit_trail: true
+  documentation_path: "docs/governance"

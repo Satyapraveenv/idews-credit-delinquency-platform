@@ -1,0 +1,138 @@
+# ============================================================
+# IDEWS — Continuous Integration Pipeline
+# Runs on every Pull Request and push to main
+# Ensures code quality and model reliability gates are met
+# ============================================================
+
+name: IDEWS CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+
+  # ── Code Quality ───────────────────────────────────────────
+  code-quality:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install linting tools
+        run: pip install ruff black isort
+
+      - name: Run Ruff linter
+        run: ruff check src/ tests/
+
+      - name: Check Black formatting
+        run: black --check src/ tests/
+
+      - name: Check import order
+        run: isort --check-only src/ tests/
+
+  # ── Unit Tests ─────────────────────────────────────────────
+  unit-tests:
+    name: Unit & Integration Tests
+    runs-on: ubuntu-latest
+    needs: code-quality
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        run: |
+          pytest tests/ -v \
+            --cov=src \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=70
+
+      - name: Upload coverage report
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  # ── Data Quality Gate ─────────────────────────────────────
+  data-quality:
+    name: Data Validation Gate
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run data validation checks
+        run: python -c "
+          from src.data.ingestion import load_dataset;
+          from src.data.validation import validate_dataset, print_validation_report;
+          df = load_dataset();
+          report = validate_dataset(df);
+          print_validation_report(report);
+          assert report['passed'], 'Data validation FAILED'
+          "
+
+  # ── API Health Test ─────────────────────────────────────────
+  api-tests:
+    name: API Contract Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt httpx
+
+      - name: Run API tests
+        run: pytest tests/test_api.py -v
+
+  # ── Docker Build Check ─────────────────────────────────────
+  docker-build:
+    name: Docker Image Build
+    runs-on: ubuntu-latest
+    needs: [unit-tests, api-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build -f docker/Dockerfile.api -t idews-api:ci .
+
+      - name: Build Dashboard image
+        run: docker build -f docker/Dockerfile.dashboard -t idews-dashboard:ci .
+
+      - name: Test API container health
+        run: |
+          docker run -d --name test-api -p 8000:8000 idews-api:ci
+          sleep 15
+          curl -f http://localhost:8000/v1/health || echo "Note: Model not loaded in CI (expected)"
+          docker stop test-api
