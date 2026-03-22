@@ -2,13 +2,13 @@
 # Python Dependencies (Streamlit Cloud deployment)
 
 # --- Core Data ---
-pandas
-numpy
+pandas>=2.0
+numpy>=1.24
 
 # --- Dashboard ---
-streamlit
-plotly
-altair
+streamlit>=1.35
+plotly>=5.0
+altair>=5.0
 
 # --- Utilities ---
 python-dotenv
