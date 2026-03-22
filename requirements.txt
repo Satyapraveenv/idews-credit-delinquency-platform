@@ -2,8 +2,8 @@
 # Python Dependencies (Streamlit Cloud deployment)
 
 # --- Core Data ---
-pandas==2.2.2
-numpy==1.26.4
+pandas
+numpy
 
 # --- Dashboard ---
 streamlit==1.35.0
